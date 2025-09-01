@@ -18,3 +18,11 @@ import ee
 ee.Authenticate()
 exit()
 ```
+
+### Order of script execution
+
+> Before executing each script, please ensure that you update the YEAR constant beforehand.
+
+1. get-imagery.py
+2. combine-tiles.py
+3. clip.py
