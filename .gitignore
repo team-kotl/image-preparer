@@ -1,0 +1,6 @@
+__pycache__
+.conda
+.vscode
+final_rasters
+tiles
+temp
