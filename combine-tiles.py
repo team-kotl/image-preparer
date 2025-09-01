@@ -2,13 +2,12 @@ import os
 import glob
 from osgeo import gdal
 
+YEAR = 2021
 tiles_dir = "tiles"
-merged_tif = "final_rasters/final.tif"
-reprojected_tif = "final_rasters/attempt6.tif"
+merged_tif = f"final_rasters/{YEAR}.tif"
 target_crs = "EPSG:32651"
 
 os.makedirs(os.path.dirname(merged_tif), exist_ok=True)
-os.makedirs(os.path.dirname(reprojected_tif), exist_ok=True)
 
 tif_files = glob.glob(os.path.join(tiles_dir, "*.tif"))
 
@@ -41,3 +40,7 @@ gdal.Translate(
     creationOptions=["COMPRESS=LZW", "BIGTIFF=YES"],
 )
 print(f"✅ Merged mosaic saved as {merged_tif}")
+
+os.remove("temp/temp.vrt")
+
+print(f"✅ Deleted temporary VRT")
