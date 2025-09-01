@@ -1,7 +1,7 @@
 import os
 from osgeo import gdal
 
-YEAR = 2019
+YEAR = 2021
 
 input_raster = f"final_rasters/{YEAR}.tif"
 mask_vector = "boundary/Municipalities.shp"
@@ -23,3 +23,5 @@ gdal.Warp(
 print(f"✅ Clipped raster saved to {output_raster}")
 
 os.remove(f"final_rasters/{YEAR}.tif")
+
+print(f"✅ Removed unclipped raster")
