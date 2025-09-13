@@ -5,8 +5,8 @@ This repository contains the scripts to download the Sentinel-2 Imagery to be us
 ### Create your conda environment
 
 ```shell
-conda create -n ee
-conda activate ee
+conda create --prefix ./ee # You can select this as your interpreter in VS Code to automate activation
+conda activate ./ee 
 conda install --file requirements.txt -c conda-forge
 ```
 
