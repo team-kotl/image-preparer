@@ -3,3 +3,4 @@ rasterio
 geemap
 folium
 gdal
+geopandas

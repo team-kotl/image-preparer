@@ -185,7 +185,7 @@ for i in range(n):
     task = ee.batch.Export.image.toDrive(
         image=true_color,
         description=f"{YEAR}_tile_{i}",
-        folder="GEE_CAR_tiles",
+        folder="CAR_tiles",
         region=tile,
         scale=10,
         crs="EPSG:32651",
