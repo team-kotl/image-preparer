@@ -4,3 +4,4 @@ geemap
 folium
 gdal
 geopandas
+tqdm
