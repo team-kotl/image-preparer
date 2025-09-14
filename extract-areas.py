@@ -1,19 +1,19 @@
 import os
 import glob
 from osgeo import gdal
+import sys
 
 # -----------------------
 # Configuration
 # -----------------------
-SOURCE_TIF = "2019.tif"
+SOURCE_TIF = None
 
 BOUNDARIES = {
     "municipality": "boundaries/municipalities",
     "province": "boundaries/provinces"
 }
 
-OUTPUT_DIR = "separated"
-
+OUTPUT_DIR = "final"
 
 def clip_with_gpkgs(boundary_type, base_dir):
     if boundary_type == "municipality":
@@ -65,11 +65,16 @@ def clip_with_gpkgs(boundary_type, base_dir):
             print(f"✔ Saved {out_tif}")
 
 
-def main():
+def run_pipeline():
     for btype, path in BOUNDARIES.items():
         print(f"\n--- Processing {btype} ---")
+        
         clip_with_gpkgs(btype, path)
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1:
+        SOURCE_TIF = sys.argv[1]
+        run_pipeline()
+    else:
+        print("No TIF provided.")

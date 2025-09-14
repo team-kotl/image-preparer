@@ -1,44 +1,22 @@
+import sys
 import ee
 import geemap
 from aoi import get_aoi_bbox
-import folium
 
 ee.Initialize(project="helical-sanctum-451207-m5")
 
 AOI = ee.Geometry.Rectangle(get_aoi_bbox())
-YEAR = 2021
-START_DATE = f"{YEAR}-04-01"
-END_DATE = f"{YEAR+1}-02-01"
-CLOUD_FILTER = 80
+YEAR = None
+START_DATE = None
+END_DATE = None
+# YEAR = 2018
+# START_DATE = f"2016-04-08"
+# END_DATE = f"2018-12-31"
+CLOUD_FILTER = 100
 CLD_PRB_THRESH = 50
 NIR_DRK_THRESH = 0.15
 CLD_PRJ_DIST = 1
 BUFFER = 50
-
-s2_sr_col = (
-    ee.ImageCollection("COPERNICUS/S2_SR")
-    .filterBounds(AOI)
-    .filterDate(START_DATE, END_DATE)
-    .filter(ee.Filter.lte("CLOUDY_PIXEL_PERCENTAGE", CLOUD_FILTER))
-)
-
-s2_cloudless_col = (
-    ee.ImageCollection("COPERNICUS/S2_CLOUD_PROBABILITY")
-    .filterBounds(AOI)
-    .filterDate(START_DATE, END_DATE)
-)
-
-imagery = ee.ImageCollection(
-    ee.Join.saveFirst("s2cloudless").apply(
-        **{
-            "primary": s2_sr_col,
-            "secondary": s2_cloudless_col,
-            "condition": ee.Filter.equals(
-                **{"leftField": "system:index", "rightField": "system:index"}
-            ),
-        }
-    )
-)
 
 
 def add_cloud_bands(img):
@@ -120,76 +98,70 @@ def apply_cld_shdw_mask(img):
     return img.select("B.*").updateMask(not_cld_shdw)
 
 
-masked = imagery.map(add_cld_shdw_mask).map(apply_cld_shdw_mask)
-cloudless = masked.median()
-true_color = cloudless.select(["B4", "B3", "B2", "B8"])
-
-
-# Define a method for displaying Earth Engine image tiles to a folium map.
-def add_ee_layer(
-    self, ee_image_object, vis_params, name, show=True, opacity=1, min_zoom=0
-):
-    map_id_dict = ee.Image(ee_image_object).getMapId(vis_params)
-    folium.raster_layers.TileLayer(
-        tiles=map_id_dict["tile_fetcher"].url_format,
-        attr='Map Data &copy; <a href="https://earthengine.google.com/">Google Earth Engine</a>',
-        name=name,
-        show=show,
-        opacity=opacity,
-        min_zoom=min_zoom,
-        overlay=True,
-        control=True,
-    ).add_to(self)
-
-
-# Add the Earth Engine layer method to folium.
-folium.Map.add_ee_layer = add_ee_layer
-
-center = AOI.centroid(10).coordinates().reverse().getInfo()
-m = folium.Map(location=center, zoom_start=12)
-
-# Add layers to the folium map.
-m.add_ee_layer(
-    cloudless,
-    {"bands": ["B4", "B3", "B2"], "min": 0, "max": 2500, "gamma": 1.1},
-    "S2 cloud-free mosaic",
-    True,
-    1,
-    9,
-)
-
-# Add a layer control panel to the map.
-m.add_child(folium.LayerControl())
-
-# Display the map.
-m.save(f"preview/{YEAR}_preview.html")
-
-
-# Export to Google Drive
-def make_grid(aoi, dx_km=50, dy_km=50):
+def make_grid(aoi, dx_km=10, dy_km=10):
     dx = dx_km / 111.32
     dy = dy_km / 110.57
     return geemap.fishnet(aoi, h_interval=dx, v_interval=dy)
 
 
-grid = make_grid(AOI, dx_km=50, dy_km=50)
-features = grid.toList(grid.size())
-n = grid.size().getInfo()
-
-for i in range(n):
-    tile = ee.Feature(features.get(i)).geometry()
-    count = masked.filterBounds(tile).size().getInfo()
-    if count == 0:
-        print(f"⚠ Tile {i} has no images, skipping.")
-        continue
-    task = ee.batch.Export.image.toDrive(
-        image=true_color,
-        description=f"{YEAR}_tile_{i}",
-        folder="CAR_tiles",
-        region=tile,
-        scale=10,
-        crs="EPSG:32651",
-        maxPixels=1e13,
+def run_pipeline():
+    s2_sr_col = (
+        ee.ImageCollection("COPERNICUS/S2_SR")
+        .filterBounds(AOI)
+        .filterDate(START_DATE, END_DATE)
+        .filter(ee.Filter.lte("CLOUDY_PIXEL_PERCENTAGE", CLOUD_FILTER))
     )
-    task.start()
-    print(f"🚀 Started export for tile {i+1}/{n}")
+
+    s2_cloudless_col = (
+        ee.ImageCollection("COPERNICUS/S2_CLOUD_PROBABILITY")
+        .filterBounds(AOI)
+        .filterDate(START_DATE, END_DATE)
+    )
+
+    imagery = ee.ImageCollection(
+        ee.Join.saveFirst("s2cloudless").apply(
+            **{
+                "primary": s2_sr_col,
+                "secondary": s2_cloudless_col,
+                "condition": ee.Filter.equals(
+                    **{"leftField": "system:index", "rightField": "system:index"}
+                ),
+            }
+        )
+    )
+
+    masked = imagery.map(add_cld_shdw_mask).map(apply_cld_shdw_mask)
+    cloudless = masked.median()
+    true_color = cloudless.select(["B4", "B3", "B2", "B8"])
+
+    grid = make_grid(AOI, dx_km=10, dy_km=10)
+    features = grid.toList(grid.size())
+    n = grid.size().getInfo()
+    from tqdm import tqdm
+
+    # Local export instead of Google Drive
+    for i in tqdm(range(n), desc="Downloading tiles"):
+        tile = ee.Feature(features.get(i)).geometry()
+        count = masked.filterBounds(tile).size().getInfo()
+        if count == 0:
+            print(f"⚠ Tile {i} has no images, skipping.")
+            continue
+        out_tif = f"tiles/{YEAR}_tile_{i}.tif"
+        geemap.ee_export_image(
+            true_color.clip(tile),
+            filename=out_tif,
+            scale=10,
+            crs="EPSG:32651",
+            region=tile,
+        )
+
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        arg = sys.argv[1]
+        YEAR = int(arg)
+        START_DATE = f"{YEAR}-04-01"
+        END_DATE = f"{YEAR+1}-02-01"
+        run_pipeline()
+    else:
+        print("No year provided.")
