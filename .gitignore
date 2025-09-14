@@ -1,7 +1,7 @@
 __pycache__
 .conda
 .vscode
-final_rasters
+merged_rasters
 clipped_rasters
 tiles
 temp
